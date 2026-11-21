@@ -1,7 +1,8 @@
-
 import * as THREE from 'three';
 import { OrbitControls } from
   'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from
+  'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/renderers/CSS2DRenderer.js';
 
 const viewer = document.getElementById('solar-viewer');
 const loadingMessage = document.getElementById('loading-message');
@@ -102,6 +103,7 @@ const worlds = [
 let scene;
 let camera;
 let renderer;
+let labelRenderer; // draws the planet name labels (HTML text over the 3D scene)
 let controls;
 let sun;
 let sunGlow;
@@ -239,6 +241,20 @@ function createStars() {
   scene.add(new THREE.Points(geometry, material));
 }
 
+// Creates an HTML text label and attaches it to a 3D object.
+// x and y are the label's position relative to that object.
+function addLabel(parent, text, x, y) {
+  const element = document.createElement('div');
+  element.className = 'planet-label';
+  element.textContent = text;
+
+  const label = new CSS2DObject(element);
+  label.position.set(x, y, 0);
+  parent.add(label);
+
+  return label;
+}
+
 function createSun() {
   const geometry = new THREE.SphereGeometry(4.5, 64, 64);
 
@@ -272,6 +288,9 @@ function createSun() {
 
   const light = new THREE.PointLight(0xffc46c, 450, 220);
   scene.add(light);
+
+  // Label below the Sun (sun radius is 4.5).
+  addLabel(sun, 'Sun', 0, -6.2);
 }
 
 function createGlowTexture() {
@@ -351,6 +370,15 @@ function createPlanet(world) {
     spin: 0.18 + world.speed
   });
 
+  // Name label below the planet. It is attached to the orbit group (not the
+  // planet mesh) so it does not spin or tilt with the planet.
+  // Saturn's rings extend further out, so its label sits lower.
+  const labelOffset = world.rings
+    ? world.radius * 1.9 + 0.9
+    : world.radius + 0.9;
+
+  addLabel(orbitGroup, world.name, world.distance, -labelOffset);
+
   if (world.rings) {
     const ringGeometry = new THREE.RingGeometry(
       world.radius * 1.35,
@@ -405,6 +433,17 @@ function setupScene() {
   );
 
   viewer.prepend(renderer.domElement);
+
+  // Layer that draws the planet name labels on top of the 3D canvas.
+  // pointer-events: none keeps dragging and clicking working on the canvas.
+  labelRenderer = new CSS2DRenderer();
+  labelRenderer.setSize(viewer.clientWidth, viewer.clientHeight);
+  labelRenderer.domElement.className = 'label-layer';
+  labelRenderer.domElement.style.position = 'absolute';
+  labelRenderer.domElement.style.top = '0';
+  labelRenderer.domElement.style.left = '0';
+  labelRenderer.domElement.style.pointerEvents = 'none';
+  viewer.appendChild(labelRenderer.domElement);
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -511,6 +550,7 @@ function animate(time = 0) {
 
   controls.update();
   renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
 }
 
 function resizeRenderer() {
@@ -524,6 +564,7 @@ function resizeRenderer() {
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
+  labelRenderer.setSize(width, height);
 }
 
 function toggleOrbits() {
